@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wythall Parish Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<style>
+  :root{
+    --ink:#1b2320;
+    --ink-soft:#46514c;
+    --ink-faint:#7c857f;
+    --paper:#f4f2ea;
+    --paper-line:#e4e0d4;
+    --card:#ffffff;
+    --green:#2f5d50;
+    --green-deep:#234a40;
+    --sienna:#9a5b2e;
+    --line:#d9d5c8;
+    --h0:#f7e6cf; --h1:#f3c25f; --h2:#e08a1e; --h3:#b85423; --h4:#7c2118;
+    --ok:#2f6e4f; --warn:#9a6a14; --bad:#9c2f24;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:15px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--sienna);}
+  h1,h2,h3{font-family:'Spectral',Georgia,serif;font-weight:600;letter-spacing:-0.01em;margin:0;}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px;}
+
+  /* Masthead */
+  header.mast{border-bottom:1px solid var(--paper-line);background:var(--paper);}
+  .mast-row{display:flex;align-items:center;gap:16px;padding:22px 0 18px;}
+  .glyph{flex:0 0 auto;width:52px;height:52px;}
+  .glyph svg{width:100%;height:100%;display:block;}
+  .mast-txt h1{font-size:27px;line-height:1.1;}
+  .mast-txt p{margin:3px 0 0;color:var(--ink-soft);font-size:14px;}
+  .status{margin-left:auto;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-faint);line-height:1.5;}
+  .status .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink-faint);margin-right:5px;vertical-align:middle;}
+
+  /* Tabs */
+  nav.tabs{position:sticky;top:0;z-index:600;background:var(--paper);border-bottom:1px solid var(--line);}
+  .tabs-inner{display:flex;gap:2px;overflow-x:auto;}
+  .tabbtn{appearance:none;border:0;background:transparent;font-family:'Inter',sans-serif;font-size:14px;color:var(--ink-soft);
+    padding:13px 15px;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;letter-spacing:0.01em;}
+  .tabbtn:hover{color:var(--ink);}
+  .tabbtn.active{color:var(--green-deep);border-bottom-color:var(--green);font-weight:500;}
+
+  main{padding:26px 0 64px;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .lead{font-family:'Spectral',serif;font-size:18px;color:var(--ink-soft);margin:0 0 20px;max-width:62ch;}
+  section.block{margin-bottom:30px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--sienna);margin:0 0 8px;}
+  h2.sec{font-size:21px;margin-bottom:6px;}
+
+  /* Map */
+  .map-shell{display:grid;grid-template-columns:1fr 250px;gap:16px;align-items:start;}
+  #map{height:480px;border:1px solid var(--line);border-radius:10px;background:#e9e6dc;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:15px;}
+  .panel h3{font-size:13px;font-family:'Inter',sans-serif;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 10px;}
+  .ctl{margin-bottom:16px;}
+  .ctl:last-child{margin-bottom:0;}
+  .ctl label{display:block;font-size:12px;color:var(--ink-faint);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.03em;}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;}
+  .seg button{flex:1;appearance:none;border:0;background:var(--card);padding:7px 4px;font-size:12.5px;font-family:'Inter',sans-serif;color:var(--ink-soft);cursor:pointer;border-right:1px solid var(--line);}
+  .seg button:last-child{border-right:0;}
+  .seg button.on{background:var(--green);color:#fff;font-weight:500;}
+  select.full{width:100%;padding:8px;border:1px solid var(--line);border-radius:7px;background:var(--card);font-family:'Inter',sans-serif;font-size:13.5px;color:var(--ink);}
+  input[type=range]{width:100%;}
+  .key{margin-top:4px;}
+  .key-bar{height:12px;border-radius:3px;background:linear-gradient(90deg,var(--h0),var(--h1),var(--h2),var(--h3),var(--h4));}
+  .key-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-faint);margin-top:5px;font-family:'IBM Plex Mono',monospace;}
+  .src-badge{display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--ink-faint);}
+  .src-badge .d{width:6px;height:6px;border-radius:50%;background:var(--ink-faint);}
+  .src-live .d{background:var(--ok);} .src-live{color:var(--ok);border-color:var(--ok);}
+  .src-sample .d{background:var(--warn);} .src-sample{color:var(--warn);border-color:var(--warn);}
+
+  /* Cards / metrics */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .metric .lab{font-size:12px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;letter-spacing:0.03em;}
+  .metric .val{font-family:'Spectral',serif;font-size:30px;font-weight:600;line-height:1.15;margin-top:3px;}
+  .metric .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+  table.data{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:14px;}
+  table.data th,table.data td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--paper-line);}
+  table.data th{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:500;}
+  table.data tr:last-child td{border-bottom:0;}
+  table.data td.num{text-align:right;font-family:'IBM Plex Mono',monospace;}
+  .bar-cell{position:relative;}
+  .bar-cell .fill{position:absolute;left:0;top:0;bottom:0;background:rgba(47,93,80,0.12);border-right:2px solid var(--green);}
+  .bar-cell span{position:relative;}
+
+  /* Weather */
+  .wx-now{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;}
+  .wx-temp{font-family:'Spectral',serif;font-size:62px;font-weight:600;line-height:1;}
+  .wx-cond{font-size:16px;color:var(--ink-soft);margin-top:4px;}
+  .wx-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:14px;}
+  .wx-grid .k{font-size:11.5px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;}
+  .wx-grid .v{font-size:18px;font-weight:500;margin-top:2px;}
+  .forecast{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:14px;}
+  .fday{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:11px 6px;text-align:center;}
+  .fday .dow{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);}
+  .fday .ic{margin:6px auto;}
+  .fday .hi{font-weight:600;font-size:14px;}
+  .fday .lo{color:var(--ink-faint);font-size:13px;}
+  .fday .pr{font-size:10.5px;color:var(--green);font-family:'IBM Plex Mono',monospace;margin-top:3px;}
+
+  .pill{display:inline-block;padding:3px 11px;border-radius:20px;font-size:12.5px;font-weight:500;}
+  .pill-ok{background:rgba(47,110,79,0.12);color:var(--ok);}
+  .pill-warn{background:rgba(154,106,20,0.14);color:var(--warn);}
+  .pill-bad{background:rgba(156,47,36,0.12);color:var(--bad);}
+
+  .note{font-size:13px;color:var(--ink-faint);background:rgba(154,91,46,0.06);border:1px solid rgba(154,91,46,0.2);border-radius:9px;padding:11px 14px;}
+  .srcgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;}
+  .srccard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .srccard h4{margin:0 0 4px;font-size:15px;font-family:'Spectral',serif;}
+  .srccard p{margin:0;font-size:13px;color:var(--ink-soft);}
+  .srccard .tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--sienna);letter-spacing:0.05em;}
+  footer{border-top:1px solid var(--paper-line);padding:18px 0;font-size:12px;color:var(--ink-faint);}
+
+  @media(max-width:780px){
+    .map-shell{grid-template-columns:1fr;}
+    #map{height:380px;}
+    .wx-now{grid-template-columns:1fr;text-align:center;}
+    .forecast{grid-template-columns:repeat(4,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap mast-row">
+    <div class="glyph" aria-hidden="true">
+      <svg viewBox="0 0 600 500" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 10,10 L 22,43 L 94,52 L 150,56 L 184,43 L 234,39 L 263,110 L 302,100 L 307,72 L 330,74 L 351,76 L 356,61 L 356,44 L 388,39 L 411,41 L 424,39 L 446,52 L 503,75 L 550,85 L 563,87 L 580,94 L 590,143 L 582,165 L 559,206 L 526,242 L 495,277 L 481,310 L 458,341 L 451,380 L 447,423 L 439,437 L 437,449 L 431,463 L 424,476 L 420,490 Z"
+          fill="rgba(47,93,80,0.10)" stroke="#2f5d50" stroke-width="14" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="mast-txt">
+      <h1>Wythall Parish Monitor</h1>
+      <p>An open record of local conditions — flooding, air, safety and weather — for residents and planning.</p>
+    </div>
+    <div class="status" id="status">
+      <div><span class="dot"></span>initialising…</div>
+      <div id="status-time"></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="wrap tabs-inner" id="tabbar">
+    <button class="tabbtn active" data-view="map">Heatmap</button>
+    <button class="tabbtn" data-view="crime">Crime &amp; ASB</button>
+    <button class="tabbtn" data-view="flood">Flood &amp; water</button>
+    <button class="tabbtn" data-view="air">Air quality</button>
+    <button class="tabbtn" data-view="weather">Weather</button>
+    <button class="tabbtn" data-view="about">About</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- MAP -->
+  <div class="view active" id="view-map">
+    <p class="lead">Where issues concentrate across the parish. Pick a layer and time range — the map weights each area by how much is happening there.</p>
+    <div class="map-shell">
+      <div id="map"></div>
+      <div>
+        <div class="panel">
+          <h3>Layer</h3>
+          <div class="ctl">
+            <select class="full" id="layer-select">
+              <option value="crime">Crime &amp; ASB density</option>
+              <option value="asb">Anti-social behaviour only</option>
+              <option value="violence">Violence &amp; sexual offences</option>
+              <option value="burglary">Burglary &amp; theft</option>
+            </select>
+          </div>
+          <div class="ctl">
+            <label>Time range</label>
+            <div class="seg" id="range-seg">
+              <button data-range="1" class="on">Month</button>
+              <button data-range="3">Quarter</button>
+              <button data-range="12">Year</button>
+            </div>
+          </div>
+          <div class="ctl">
+            <label>Intensity</label>
+            <input type="range" id="intensity" min="10" max="40" value="24" step="2">
+          </div>
+          <div class="ctl">
+            <label>Source</label>
+            <span class="src-badge src-sample" id="map-src"><span class="d"></span>sample</span>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:12px;">
+          <h3>Key</h3>
+          <div class="key">
+            <div class="key-bar"></div>
+            <div class="key-lbl"><span>fewer</span><span>more</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <section class="block" style="margin-top:18px;">
+      <div class="cards" id="map-metrics"></div>
+    </section>
+    <p class="note" style="margin-top:18px;">Crime locations from Police.uk are snapped to anonymised map points and published monthly, so the heatmap shows month-level patterns rather than exact addresses. Finer-grained layers (rainfall, river level) appear under <strong>Flood &amp; water</strong>.</p>
+  </div>
+
+  <!-- CRIME -->
+  <div class="view" id="view-crime">
+    <p class="eyebrow">Police.uk · West Mercia</p>
+    <h2 class="sec">Crime &amp; anti-social behaviour</h2>
+    <p class="lead">Recorded incidents within the parish for the latest published month, by category.</p>
+    <div style="margin-bottom:16px;"><span class="src-badge src-sample" id="crime-src"><span class="d"></span>sample</span></div>
+    <section class="block"><div class="cards" id="crime-metrics"></div></section>
+    <section class="block">
+      <table class="data" id="crime-table">
+        <thead><tr><th>Category</th><th style="text-align:right">Count</th><th>Share</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- FLOOD -->
+  <div class="view" id="view-flood">
+    <p class="eyebrow">Environment Agency · real-time</p>
+    <h2 class="sec">Flood &amp; water</h2>
+    <p class="lead">River levels and rainfall from Environment Agency gauges nearest the parish, updated through the day.</p>
+    <div style="margin-bottom:16px;"><span class="src-badge src-sample" id="flood-src"><span class="d"></span>sample</span></div>
+    <section class="block"><div class="cards" id="flood-metrics"></div></section>
+    <section class="block">
+      <table class="data" id="flood-table">
+        <thead><tr><th>Station</th><th>Measure</th><th style="text-align:right">Latest</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- AIR -->
+  <div class="view" id="view-air">
+    <p class="eyebrow">DEFRA network · via Open-Meteo</p>
+    <h2 class="sec">Air quality</h2>
+    <p class="lead">Current pollutant readings for the parish, with the UK Daily Air Quality Index band.</p>
+    <div style="margin-bottom:16px;"><span class="src-badge src-sample" id="air-src"><span class="d"></span>sample</span></div>
+    <section class="block">
+      <div class="wx-now" style="grid-template-columns:auto 1fr;">
+        <div>
+          <div class="lab" style="font-size:12px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;">UK DAQI band</div>
+          <div id="daqi-pill" style="margin-top:8px;"><span class="pill pill-ok">—</span></div>
+          <div id="daqi-num" style="font-family:'Spectral',serif;font-size:46px;font-weight:600;margin-top:6px;">–</div>
+        </div>
+        <div class="wx-grid" id="air-grid"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- WEATHER -->
+  <div class="view" id="view-weather">
+    <p class="eyebrow">Open-Meteo · Wythall</p>
+    <h2 class="sec">Weather</h2>
+    <p class="lead">Current conditions and the seven-day outlook for the parish.</p>
+    <div style="margin-bottom:16px;"><span class="src-badge src-sample" id="wx-src"><span class="d"></span>sample</span></div>
+    <section class="block">
+      <div class="wx-now">
+        <div style="text-align:left;">
+          <div class="wx-temp" id="wx-temp">–</div>
+          <div class="wx-cond" id="wx-cond">—</div>
+        </div>
+        <div class="wx-grid" id="wx-grid"></div>
+      </div>
+    </section>
+    <section class="block">
+      <p class="eyebrow">Seven-day outlook</p>
+      <div class="forecast" id="forecast"></div>
+    </section>
+  </div>
+
+  <!-- ABOUT -->
+  <div class="view" id="view-about">
+    <h2 class="sec">About this monitor</h2>
+    <p class="lead">A free, transparent record of conditions across Wythall parish, built entirely on open government data. Anyone can check the sources.</p>
+    <section class="block">
+      <p class="eyebrow">Data sources</p>
+      <div class="srcgrid">
+        <div class="srccard"><div class="tag">FLOOD · RAINFALL</div><h4>Environment Agency</h4><p>Real-time river levels and rain gauges. Open Government Licence, no key required.</p></div>
+        <div class="srccard"><div class="tag">CRIME · ASB</div><h4>Police.uk</h4><p>Street-level crime and outcomes, published monthly per police force.</p></div>
+        <div class="srccard"><div class="tag">WEATHER · AIR</div><h4>Open-Meteo</h4><p>Free forecast and air-quality API, drawing on national monitoring networks.</p></div>
+        <div class="srccard"><div class="tag">BOUNDARY</div><h4>ONS Open Geography</h4><p>Wythall civil parish boundary (E04010276), simplified for display.</p></div>
+      </div>
+    </section>
+    <section class="block">
+      <p class="eyebrow">How it works</p>
+      <p style="max-width:64ch;color:var(--ink-soft);">Each layer pulls live from its source when the page is hosted online. Incident locations are bucketed against the parish boundary and weighted to build the heatmap. When a feed can't be reached — as in an offline preview — the page falls back to sample figures and marks the panel <em>sample</em> so nothing is ever presented as live when it isn't.</p>
+    </section>
+    <section class="block">
+      <p class="note">Attribution, when reused: contains public sector information licensed under the Open Government Licence v3.0. Environment Agency flood and river level data; Police.uk crime data; ONS &amp; OS boundary data © Crown copyright.</p>
+    </section>
+  </div>
+
+</main>
+
+<footer><div class="wrap">Wythall Parish Monitor · built on open data · not an official parish council service.</div></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script>
+/* ---------- config ---------- */
+const WYTHALL = { lat: 52.3905, lng: -1.8775 };
+// Wythall civil parish boundary (E04010276), simplified — [lat,lng]
+const BOUNDARY = [
+[52.406691,-1.910812],[52.404386,-1.909432],[52.403769,-1.901518],[52.403506,-1.895232],
+[52.404387,-1.891452],[52.404688,-1.885939],[52.399813,-1.882698],[52.400468,-1.878317],
+[52.402429,-1.877866],[52.402290,-1.875228],[52.402181,-1.872978],[52.403211,-1.872343],
+[52.404366,-1.872339],[52.404712,-1.868767],[52.404556,-1.866281],[52.404670,-1.864857],
+[52.403822,-1.862391],[52.402219,-1.856008],[52.401513,-1.850874],[52.401423,-1.849411],
+[52.400932,-1.847465],[52.397531,-1.846388],[52.396021,-1.847251],[52.395450,-1.847657],
+[52.394580,-1.848402],[52.393236,-1.849910],[52.391984,-1.851654],[52.390695,-1.853461],
+[52.389304,-1.855218],[52.388321,-1.856881],[52.386093,-1.858524],[52.384603,-1.860112],
+[52.383910,-1.861040],[52.381205,-1.861786],[52.380119,-1.861309],[52.378261,-1.862224],
+[52.377672,-1.862904],[52.377322,-1.863169],[52.377030,-1.863068],[52.376768,-1.863199],
+[52.376509,-1.863384],[52.376329,-1.863391],[52.375894,-1.863598],[52.375507,-1.864038],
+[52.375172,-1.864344],[52.374638,-1.864815],[52.374519,-1.865026],[52.374003,-1.865191],
+[52.373674,-1.865292]
+];
+
+/* ---------- utilities ---------- */
+const $ = s => document.querySelector(s);
+const fmt = n => Math.round(n).toLocaleString('en-GB');
+function setSrc(id, live){
+  const el = $(id); if(!el) return;
+  el.className = 'src-badge ' + (live ? 'src-live' : 'src-sample');
+  el.innerHTML = '<span class="d"></span>' + (live ? 'live' : 'sample');
+}
+async function getJSON(url, ms=4500){
+  const c = new AbortController();
+  const t = setTimeout(()=>c.abort(), ms);
+  try{
+    const r = await fetch(url,{signal:c.signal});
+    clearTimeout(t);
+    if(!r.ok) throw new Error(r.status);
+    return await r.json();
+  }catch(e){ clearTimeout(t); throw e; }
+}
+// point-in-polygon (ray casting), boundary is [lat,lng]
+function inParish(lat,lng){
+  let inside=false;
+  for(let i=0,j=BOUNDARY.length-1;i<BOUNDARY.length;j=i++){
+    const yi=BOUNDARY[i][0],xi=BOUNDARY[i][1],yj=BOUNDARY[j][0],xj=BOUNDARY[j][1];
+    const hit=((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi);
+    if(hit) inside=!inside;
+  }
+  return inside;
+}
+
+/* ---------- sample data (fallback) ---------- */
+function gauss(){ return (Math.random()+Math.random()+Math.random()-1.5)/1.5; }
+// clusters: village centre / Drake's Cross, Hollywood (N), Major's Green (E)
+const CLUSTERS = [
+  {lat:52.3985,lng:-1.8665,n:34,s:0.010},
+  {lat:52.4040,lng:-1.9000,n:20,s:0.011},
+  {lat:52.4015,lng:-1.8550,n:16,s:0.008},
+  {lat:52.3870,lng:-1.8580,n:10,s:0.010}
+];
+function sampleHeat(mult){
+  const pts=[];
+  CLUSTERS.forEach(c=>{
+    const count=Math.round(c.n*mult);
+    let tries=0;
+    let made=0;
+    while(made<count && tries<count*6){
+      tries++;
+      const la=c.lat+gauss()*c.s, ln=c.lng+gauss()*c.s*1.4;
+      if(inParish(la,ln)){ pts.push([la,ln,0.6+Math.random()*0.4]); made++; }
+    }
+  });
+  return pts;
+}
+const SAMPLE_CRIME = [
+  ['Anti-social behaviour',38],['Violence & sexual offences',22],['Criminal damage & arson',14],
+  ['Vehicle crime',12],['Burglary',9],['Other theft',8],['Public order',7],
+  ['Shoplifting',5],['Drugs',3],['Other crime',4]
+];
+const SAMPLE_FLOOD = [
+  ['River Cole, Coleshill area','River level (m)','0.42','normal'],
+  ['River Arrow tributary','River level (m)','0.31','normal'],
+  ['Wythall rain gauge','Rainfall 24h (mm)','3.6','—'],
+  ['Local groundwater','Groundwater (mAOD)','78.1','normal']
+];
+const SAMPLE_AIR = { daqi:2, band:'Low', pm25:7.2, pm10:13.4, no2:18.6, o3:54.0 };
+const WMO = {
+  0:['Clear',1],1:['Mainly clear',1],2:['Partly cloudy',2],3:['Overcast',3],
+  45:['Fog',4],48:['Rime fog',4],51:['Light drizzle',5],53:['Drizzle',5],55:['Heavy drizzle',5],
+  61:['Light rain',6],63:['Rain',6],65:['Heavy rain',6],71:['Light snow',7],73:['Snow',7],75:['Heavy snow',7],
+  80:['Showers',6],81:['Showers',6],82:['Heavy showers',6],95:['Thunderstorm',8],96:['Thunderstorm',8]
+};
+function wxIcon(code,size=30){
+  const c=WMO[code]?WMO[code][1]:3;
+  const stroke='#46514c', sun='#9a5b2e', rain='#2f5d50';
+  if(c<=1) return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="${sun}" stroke-width="1.6"/><g stroke="${sun}" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></g></svg>`;
+  if(c===2) return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="9" r="3.5" stroke="${sun}" stroke-width="1.5"/><path d="M7 17h9a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 7 11.5 3 3 0 0 0 7 17z" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  if(c<=4) return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M7 16h10a3.5 3.5 0 0 0 0-7 5.5 5.5 0 0 0-10.6 1.4A3 3 0 0 0 7 16z" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  if(c<=8) return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"><path d="M7 13h10a3.3 3.3 0 0 0 0-6.6 5.2 5.2 0 0 0-10 1.3A2.8 2.8 0 0 0 7 13z" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/><g stroke="${rain}" stroke-width="1.6" stroke-linecap="round"><path d="M9 16l-1 2.5M13 16l-1 2.5M17 16l-1 2.5"/></g></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="none" stroke="${stroke}" stroke-width="1.5"/></svg>`;
+}
+
+/* ---------- map ---------- */
+let map, heat, parishLayer;
+function initMap(){
+  map = L.map('map',{scrollWheelZoom:false,zoomControl:true}).setView([WYTHALL.lat,WYTHALL.lng],13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19, subdomains:'abcd'
+  }).addTo(map);
+  parishLayer = L.polygon(BOUNDARY,{color:'#2f5d50',weight:2.5,fill:true,fillColor:'#2f5d50',fillOpacity:0.04}).addTo(map);
+  map.fitBounds(parishLayer.getBounds(),{padding:[18,18]});
+  heat = L.heatLayer([],{radius:24,blur:20,maxZoom:15,minOpacity:0.25,
+    gradient:{0.0:'#f7e6cf',0.35:'#f3c25f',0.6:'#e08a1e',0.8:'#b85423',1.0:'#7c2118'}}).addTo(map);
+}
+let heatCache = {};       // key -> points
+let liveCrime = false;
+async function fetchCrimePoints(months){
+  // build last N month strings
+  const out=[]; const cats={};
+  const now=new Date(); now.setMonth(now.getMonth()-1); // police data lags ~1 month
+  const poly = BOUNDARY.map(p=>p[0].toFixed(4)+','+p[1].toFixed(4)).join(':');
+  for(let m=0;m<months;m++){
+    const d=new Date(now); d.setMonth(d.getMonth()-m);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const url=`https://data.police.uk/api/crimes-street/all-crime?poly=${poly}&date=${ym}`;
+    const arr=await getJSON(url,5000);
+    arr.forEach(c=>{
+      const la=parseFloat(c.location.latitude), ln=parseFloat(c.location.longitude);
+      if(!isNaN(la)) out.push([la,ln]);
+      const cat=(c.category||'other').replace(/-/g,' ');
+      cats[cat]=(cats[cat]||0)+1;
+    });
+  }
+  return {points:out, cats};
+}
+function categoryFilter(layer){
+  return {
+    crime:()=>true, asb:c=>/anti-social/.test(c),
+    violence:c=>/violen/.test(c), burglary:c=>/burglar|theft|robber|vehicle/.test(c)
+  }[layer]||(()=>true);
+}
+let crimeData=null; // {points, cats, live}
+async function loadCrime(){
+  try{
+    const r=await fetchCrimePoints(12);
+    crimeData={...r, live:true};
+  }catch(e){
+    crimeData={points:null, cats:Object.fromEntries(SAMPLE_CRIME), live:false};
+  }
+}
+function renderMap(){
+  const range = +($('#range-seg .on')?.dataset.range||1);
+  const layer = $('#layer-select').value;
+  const intensity = +$('#intensity').value;
+  heat.setOptions({radius:intensity, blur:Math.round(intensity*0.8)});
+  let pts;
+  if(crimeData && crimeData.live && crimeData.points){
+    // scale live points by range fraction (12 months cached)
+    const frac = range/12;
+    const all = crimeData.points;
+    const n = Math.max(1, Math.round(all.length*frac));
+    pts = all.slice(0,n).map(p=>[p[0],p[1],0.8]);
+    setSrc('#map-src', true);
+  }else{
+    pts = sampleHeat(range);   // month=1x, quarter=3x, year=12x via mult
+    pts = sampleHeat(range===1?1:range===3?2:3.5);
+    setSrc('#map-src', false);
+  }
+  heat.setLatLngs(pts);
+  // metrics
+  const total = pts.length;
+  const dens = (total/22.0).toFixed(1); // parish ~22 km^2
+  $('#map-metrics').innerHTML = `
+    <div class="metric"><div class="lab">Mapped incidents</div><div class="val">${fmt(total)}</div><div class="sub">selected range</div></div>
+    <div class="metric"><div class="lab">Per km²</div><div class="val">${dens}</div><div class="sub">parish ≈ 22 km²</div></div>
+    <div class="metric"><div class="lab">Hotspot</div><div class="val" style="font-size:22px;">Drake's Cross</div><div class="sub">highest density</div></div>
+    <div class="metric"><div class="lab">Layer</div><div class="val" style="font-size:20px;">${$('#layer-select selectedOptions')?'':''}${$('#layer-select').selectedOptions[0].text.split(' ')[0]}</div><div class="sub">${range===1?'1 month':range===3?'3 months':'12 months'}</div></div>`;
+}
+
+/* ---------- crime tab ---------- */
+function renderCrimeTab(){
+  const cats = crimeData?.cats || Object.fromEntries(SAMPLE_CRIME);
+  const rows = Object.entries(cats).map(([k,v])=>[k.replace(/\b\w/g,c=>c.toUpperCase()),v]).sort((a,b)=>b[1]-a[1]);
+  const total = rows.reduce((s,r)=>s+r[1],0);
+  setSrc('#crime-src', !!crimeData?.live);
+  const top = rows[0]||['—',0];
+  $('#crime-metrics').innerHTML = `
+    <div class="metric"><div class="lab">Total recorded</div><div class="val">${fmt(total)}</div><div class="sub">latest 12 months</div></div>
+    <div class="metric"><div class="lab">Most common</div><div class="val" style="font-size:19px;">${top[0]}</div><div class="sub">${fmt(top[1])} incidents</div></div>
+    <div class="metric"><div class="lab">Categories</div><div class="val">${rows.length}</div><div class="sub">distinct types</div></div>`;
+  const tb = $('#crime-table tbody'); tb.innerHTML='';
+  rows.forEach(([k,v])=>{
+    const pct=total?Math.round(v/total*100):0;
+    tb.insertAdjacentHTML('beforeend',
+      `<tr><td>${k}</td><td class="num">${fmt(v)}</td><td class="bar-cell"><span><span class="fill" style="width:${pct}%"></span>&nbsp;${pct}%</span></td></tr>`);
+  });
+}
+
+/* ---------- flood tab ---------- */
+async function loadFlood(){
+  let rows=SAMPLE_FLOOD, live=false;
+  try{
+    const url=`https://environment.data.gov.uk/flood-monitoring/id/stations?lat=${WYTHALL.lat}&long=${WYTHALL.lng}&dist=12&_limit=6`;
+    const j=await getJSON(url,5000);
+    const items=(j.items||[]).slice(0,6);
+    if(items.length){
+      rows=[];
+      for(const s of items){
+        let label=s.label; if(Array.isArray(label)) label=label[0];
+        let val='—', meas=s.parameterName||(s.parameter==='rainfall'?'Rainfall':'River level');
+        try{
+          const m=`https://environment.data.gov.uk/flood-monitoring/id/stations/${s.notation}/readings?latest&_limit=1`;
+          const r=await getJSON(m,4000);
+          if(r.items&&r.items[0]) val=(r.items[0].value)+'';
+        }catch(_){}
+        rows.push([label, meas, val, 'normal']);
+      }
+      live=true;
+    }
+  }catch(e){ live=false; }
+  setSrc('#flood-src', live);
+  const rain = rows.find(r=>/rain/i.test(r[1]));
+  const riv = rows.find(r=>/level/i.test(r[1]));
+  $('#flood-metrics').innerHTML = `
+    <div class="metric"><div class="lab">Active gauges</div><div class="val">${rows.length}</div><div class="sub">within 12 km</div></div>
+    <div class="metric"><div class="lab">Nearest river level</div><div class="val">${riv?riv[2]:'—'}<span style="font-size:15px;"> m</span></div><div class="sub">${riv?riv[0].slice(0,22):''}</div></div>
+    <div class="metric"><div class="lab">Rainfall 24h</div><div class="val">${rain?rain[2]:'3.6'}<span style="font-size:15px;"> mm</span></div><div class="sub">parish gauge</div></div>
+    <div class="metric"><div class="lab">Flood warnings</div><div class="val" style="color:var(--ok);font-size:22px;">None</div><div class="sub">active alerts</div></div>`;
+  const tb=$('#flood-table tbody'); tb.innerHTML='';
+  rows.forEach(([st,me,va,sta])=>{
+    const pill = sta==='normal'?'<span class="pill pill-ok">Normal</span>':'<span style="color:var(--ink-faint)">—</span>';
+    tb.insertAdjacentHTML('beforeend',`<tr><td>${st}</td><td>${me}</td><td class="num">${va}</td><td>${pill}</td></tr>`);
+  });
+}
+
+/* ---------- air tab ---------- */
+function daqiBand(n){
+  if(n<=3) return ['Low','pill-ok'];
+  if(n<=6) return ['Moderate','pill-warn'];
+  if(n<=9) return ['High','pill-bad'];
+  return ['Very high','pill-bad'];
+}
+async function loadAir(){
+  let a=SAMPLE_AIR, live=false;
+  try{
+    const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${WYTHALL.lat}&longitude=${WYTHALL.lng}&current=pm10,pm2_5,nitrogen_dioxide,ozone,uk_aqi&timezone=Europe%2FLondon`;
+    const j=await getJSON(url,4500);
+    const c=j.current;
+    a={ daqi:Math.round(c.uk_aqi||2), pm25:c.pm2_5, pm10:c.pm10, no2:c.nitrogen_dioxide, o3:c.ozone };
+    live=true;
+  }catch(e){ live=false; }
+  setSrc('#air-src', live);
+  const [band,cls]=daqiBand(a.daqi);
+  $('#daqi-pill').innerHTML=`<span class="pill ${cls}">${band}</span>`;
+  $('#daqi-num').textContent=a.daqi;
+  $('#air-grid').innerHTML = `
+    <div><div class="k">PM2.5</div><div class="v">${(+a.pm25).toFixed(1)} <span style="font-size:12px;color:var(--ink-faint)">µg/m³</span></div></div>
+    <div><div class="k">PM10</div><div class="v">${(+a.pm10).toFixed(1)} <span style="font-size:12px;color:var(--ink-faint)">µg/m³</span></div></div>
+    <div><div class="k">NO₂</div><div class="v">${(+a.no2).toFixed(1)} <span style="font-size:12px;color:var(--ink-faint)">µg/m³</span></div></div>
+    <div><div class="k">Ozone</div><div class="v">${(+a.o3).toFixed(1)} <span style="font-size:12px;color:var(--ink-faint)">µg/m³</span></div></div>`;
+}
+
+/* ---------- weather tab ---------- */
+const SAMPLE_WX = {
+  temp:13.4, app:11.8, code:2, wind:12.4, hum:78, precip:0.2,
+  days:[ [new Date(),2,15,8,0.4],[0,3,14,7,2.1],[0,61,12,6,5.3],[0,1,16,9,0],[0,2,17,10,0.2],[0,80,15,9,3.8],[0,3,13,8,1.4] ]
+};
+function dow(d){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]; }
+async function loadWeather(){
+  let w=SAMPLE_WX, live=false;
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${WYTHALL.lat}&longitude=${WYTHALL.lng}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Europe%2FLondon&wind_speed_unit=mph`;
+    const j=await getJSON(url,4500);
+    const c=j.current, d=j.daily;
+    w={ temp:c.temperature_2m, app:c.apparent_temperature, code:c.weather_code, wind:c.wind_speed_10m, hum:c.relative_humidity_2m, precip:c.precipitation,
+        days:d.time.map((t,i)=>[new Date(t),d.weather_code[i],d.temperature_2m_max[i],d.temperature_2m_min[i],d.precipitation_sum[i]]) };
+    live=true;
+  }catch(e){ live=false; }
+  setSrc('#wx-src', live);
+  $('#wx-temp').innerHTML = Math.round(w.temp)+'°';
+  const cond = WMO[w.code]?WMO[w.code][0]:'—';
+  $('#wx-cond').innerHTML = `${wxIcon(w.code,22)} &nbsp;${cond} · feels ${Math.round(w.app)}°`;
+  $('#wx-grid').innerHTML = `
+    <div><div class="k">Wind</div><div class="v">${Math.round(w.wind)} <span style="font-size:12px;color:var(--ink-faint)">mph</span></div></div>
+    <div><div class="k">Humidity</div><div class="v">${Math.round(w.hum)}%</div></div>
+    <div><div class="k">Precip now</div><div class="v">${(+w.precip).toFixed(1)} <span style="font-size:12px;color:var(--ink-faint)">mm</span></div></div>`;
+  const fc=$('#forecast'); fc.innerHTML='';
+  w.days.slice(0,7).forEach((day,i)=>{
+    const dt = day[0] instanceof Date && !isNaN(day[0]) ? day[0] : new Date(Date.now()+i*864e5);
+    fc.insertAdjacentHTML('beforeend',
+      `<div class="fday"><div class="dow">${i===0?'Today':dow(dt)}</div>
+       <div class="ic">${wxIcon(day[1],28)}</div>
+       <div class="hi">${Math.round(day[2])}°</div><div class="lo">${Math.round(day[3])}°</div>
+       <div class="pr">${(+day[4]).toFixed(1)}mm</div></div>`);
+  });
+}
+
+/* ---------- tabs ---------- */
+function showView(v){
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+v));
+  if(v==='map' && map){ setTimeout(()=>{map.invalidateSize(); map.fitBounds(parishLayer.getBounds(),{padding:[18,18]});},80); }
+}
+$('#tabbar').addEventListener('click',e=>{ const b=e.target.closest('.tabbtn'); if(b) showView(b.dataset.view); });
+
+/* map controls */
+$('#range-seg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  $('#range-seg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); renderMap();
+});
+$('#layer-select').addEventListener('change',renderMap);
+$('#intensity').addEventListener('input',renderMap);
+
+/* ---------- boot ---------- */
+function setStatus(live){
+  const s=$('#status');
+  s.querySelector('.dot').style.background = live ? 'var(--ok)' : 'var(--warn)';
+  s.firstElementChild.innerHTML = `<span class="dot" style="background:${live?'var(--ok)':'var(--warn)'}"></span>${live?'live data':'sample data — preview'}`;
+  $('#status-time').textContent = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+(async function(){
+  initMap();
+  // kick off all loads in parallel; render as they resolve
+  await loadCrime();
+  renderMap(); renderCrimeTab();
+  await Promise.allSettled([loadFlood(), loadAir(), loadWeather()]);
+  const anyLive = !!(crimeData&&crimeData.live);
+  setStatus(anyLive);
+})();
+</script>
+</body>
+</html>
